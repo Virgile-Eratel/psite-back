@@ -1,14 +1,15 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseInterceptors, UploadedFile, Res, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseInterceptors, UploadedFile, Res, NotFoundException, Query, Req } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { ImagesService } from './images.service';
 import { Image } from './entities/image.entity';
 import { CreateImageDto } from './dto/create-image.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { IMAGES_STORAGE_PATH } from '../config/storage.config';
+import { v4 as uuidv4 } from 'uuid';
 
 @Controller('images')
 export class ImagesController {
@@ -52,6 +53,49 @@ export class ImagesController {
   @Get('random')
   async findRandom(): Promise<Image[]> {
     return this.imagesService.findRandom(3);
+  }
+
+  @Get('random-non-repeating')
+  async findRandomNonRepeating(
+    @Query('sessionId') sessionId: string,
+    @Query('count') count: string,
+    @Req() req: Request,
+  ): Promise<Image[]> {
+    // Si aucun sessionId n'est fourni, en générer un nouveau
+    const session = sessionId || uuidv4();
+    
+    // Utiliser l'IP du client comme partie du sessionId pour plus de sécurité
+    const clientIp = req.ip || 'unknown';
+    const fullSessionId = `${session}-${clientIp}`;
+    
+    return this.imagesService.findRandomNonRepeating(
+      fullSessionId,
+      count ? parseInt(count, 10) : 3,
+    );
+  }
+
+  @Get('next-batch')
+  async getNextRandomBatch(
+    @Query('sessionId') sessionId: string,
+    @Query('count') count: string,
+    @Req() req: Request,
+  ): Promise<{ sessionId: string; images: Image[] }> {
+    // Si aucun sessionId n'est fourni, en générer un nouveau
+    const session = sessionId || uuidv4();
+    
+    // Utiliser l'IP du client comme partie du sessionId pour plus de sécurité
+    const clientIp = req.ip || 'unknown';
+    const fullSessionId = `${session}-${clientIp}`;
+    
+    const images = await this.imagesService.getNextRandomBatch(
+      fullSessionId,
+      count ? parseInt(count, 10) : 3,
+    );
+    
+    return {
+      sessionId: session, // Retourner le sessionId pour les prochaines requêtes
+      images,
+    };
   }
 
   @Get(':id')
