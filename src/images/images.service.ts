@@ -35,4 +35,27 @@ export class ImagesService {
   async remove(id: number): Promise<void> {
     await this.imageRepository.delete(id);
   }
+
+  /**
+   * Get random images
+   * @param count Number of random images to retrieve
+   */
+  async findRandom(count: number = 3): Promise<Image[]> {
+    // Get all images
+    const allImages = await this.imageRepository.find();
+
+    // If we have fewer images than requested, return all images
+    if (allImages.length <= count) {
+      return allImages;
+    }
+
+    // Shuffle the array using Fisher-Yates algorithm
+    for (let i = allImages.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allImages[i], allImages[j]] = [allImages[j], allImages[i]];
+    }
+
+    // Return the first 'count' images
+    return allImages.slice(0, count);
+  }
 }

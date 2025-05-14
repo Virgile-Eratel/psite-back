@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseInterceptors, UploadedFile, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseInterceptors, UploadedFile, Res, NotFoundException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -8,6 +8,7 @@ import { Image } from './entities/image.entity';
 import { CreateImageDto } from './dto/create-image.dto';
 import * as fs from 'fs';
 import * as path from 'path';
+import { IMAGES_STORAGE_PATH } from '../config/storage.config';
 
 @Controller('images')
 export class ImagesController {
@@ -17,7 +18,7 @@ export class ImagesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
-        destination: '../../images',
+        destination: IMAGES_STORAGE_PATH,
         filename: (req, file, cb) => {
           // Generate a unique filename
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -34,7 +35,7 @@ export class ImagesController {
   ): Promise<Image> {
     // Extract name from file name if not provided
     const name = createImageDto.name || file.originalname.split('.')[0];
-    
+
     // Create image entity
     return this.imagesService.create({
       name,
@@ -48,6 +49,11 @@ export class ImagesController {
     return this.imagesService.findAll();
   }
 
+  @Get('random')
+  async findRandom(): Promise<Image[]> {
+    return this.imagesService.findRandom(3);
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Image> {
     return this.imagesService.findOne(+id);
@@ -55,15 +61,39 @@ export class ImagesController {
 
   @Get('file/:filename')
   async getFile(@Param('filename') filename: string, @Res() res: Response) {
-    const filePath = path.join('../../images', filename);
-    
+    const filePath = path.join(IMAGES_STORAGE_PATH, filename);
+
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       return res.status(404).send({ message: 'File not found' });
     }
-    
+
     // Send file
-    res.sendFile(filename, { root: '../../images' });
+    res.sendFile(filename, { root: IMAGES_STORAGE_PATH });
+  }
+
+  @Get('view/:id')
+  async viewImage(@Param('id') id: string, @Res() res: Response) {
+    try {
+      // Récupérer l'image par son ID
+      const image = await this.imagesService.findOne(+id);
+
+      // Construire le chemin du fichier
+      const filePath = path.join(IMAGES_STORAGE_PATH, image.fileName);
+
+      // Vérifier si le fichier existe
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send({ message: 'Image file not found' });
+      }
+
+      // Envoyer le fichier
+      res.sendFile(image.fileName, { root: IMAGES_STORAGE_PATH });
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        return res.status(404).send({ message: 'Image not found' });
+      }
+      return res.status(500).send({ message: 'Internal server error' });
+    }
   }
 
   @Put(':id')
@@ -75,13 +105,13 @@ export class ImagesController {
   async remove(@Param('id') id: string): Promise<void> {
     // Get image to delete file
     const image = await this.imagesService.findOne(+id);
-    
+
     // Delete file
-    const filePath = path.join('../../images', image.fileName);
+    const filePath = path.join(IMAGES_STORAGE_PATH, image.fileName);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
-    
+
     // Delete from database
     return this.imagesService.remove(+id);
   }
