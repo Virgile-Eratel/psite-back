@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity()
 export class Image {
@@ -13,6 +19,9 @@ export class Image {
 
   @Column({ type: 'varchar', length: 255 })
   fileName: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  filePath: string;
 
   @CreateDateColumn({ type: 'timestamp' })
   createdAt: Date;
