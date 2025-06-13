@@ -66,4 +66,12 @@ export class ImagesService {
       throw new NotFoundException('Image not found');
     }
   }
+
+  async getRandom(take: number, excludeIds: number[]): Promise<Image[]> {
+    const qb = this.repo.createQueryBuilder('image');
+    if (excludeIds.length) {
+      qb.where('image.id NOT IN (:...excludeIds)', { excludeIds });
+    }
+    return qb.orderBy('RANDOM()').take(take).getMany();
+  }
 }
